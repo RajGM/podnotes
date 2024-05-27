@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  nodejs-server:
+    image: node:14
+    container_name: nodejs-server
+    working_dir: /app
+    volumes:
+      - ./nodejs:/app
+    ports:
+      - "5000:5000"
+    command: sh -c "npm install && npm run start"
+    networks:
+      - app-network
+
+  nextjs-server:
+    image: node:14
+    container_name: nextjs-server
+    working_dir: /app
+    volumes:
+      - ./nextjs:/app
+    ports:
+      - "3000:3000"
+    command: sh -c "npm install && npm run dev"
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
