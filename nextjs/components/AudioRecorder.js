@@ -24,29 +24,28 @@ const AudioRecorder = () => {
 
 
   const startRecording = async () => {
-   try {
-      // Request access to the user's microphone
+    try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  
-      // Initialize the MediaRecorder with the audio stream
-      const recorder = new MediaRecorder(stream);
-     // setMediaRecorder(recorder);
-  
-       // Ensure ondataavailable is set before starting the recorder
-       recorder.ondataavailable = (event) => {
+      const mimeType = 'audio/webm;codecs=opus';
+      const recorder = new MediaRecorder(stream, { mimeType });
+
+      recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
-          setAudioChunks((prevChunks) => [...prevChunks, event.data]);
+          setAudioChunks((prevChunks) => {
+            const updatedChunks = [...prevChunks, event.data];
+            console.log('Updated audio chunks:', updatedChunks);
+            return updatedChunks;
+          });
         }
         console.log('ondataavailable event:', event.data);
       };
-  
+
       setMediaRecorder(recorder);
-
-
-      // Start recording
+      
       recorder.start();
       setRecording(true);
       setPaused(false);
+      console.log('Recording started');
     } catch (err) {
       console.error('Error accessing media devices.', err);
     }
@@ -67,27 +66,41 @@ const AudioRecorder = () => {
     }
   };
 
-  const stopRecording = async () => {
+  const stopRecording = () => {
     if (mediaRecorder) {
       mediaRecorder.stop();
-      mediaRecorder.onstop = async () => {
-        console.log("recording stopped:, audioChunks", audioChunks)
-        const audioBlob = new Blob(audioChunks);
-         // const filePath = `${sessionId}/recording-${Date.now()}.webm`;
+      
+      const stopHandler = new Promise((resolve) => {
+        mediaRecorder.onstop = () => {
+          resolve();
+        };
+      });
 
-        
+      //await stopHandler;
+
+      console.log("Recording stopped, audioChunks:", audioChunks);
+
+      if (audioChunks.length > 0) {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm;codecs=opus' });
         const audioUrl = URL.createObjectURL(audioBlob);
         console.log(audioUrl);
+
+        // Play the recorded audio
         const audio = new Audio(audioUrl);
         audio.play().catch(error => {
-            console.error('Error playing audio:', error);
-          });
+          console.error('Error playing audio:', error);
+        });
 
-          if (audioChunks.length > 0) {
-            console.log('Audio recorded:', audioChunks);
-        }else{
-            console.log('No audio chunks to record');
-        }
+        audio.onended = () => {
+          URL.revokeObjectURL(audioUrl);
+          setAudioChunks([]);
+          setRecording(false);
+          setPaused(false);
+        };
+
+        // Uncomment the following code to upload the audio and store session info
+        // const filePath = `${sessionId}/recording-${Date.now()}.webm`;
+
         // const { data, error } = await supabase.storage.from(bucketName).upload(filePath, audioBlob, {
         //   contentType: 'audio/webm',
         // });
@@ -97,7 +110,7 @@ const AudioRecorder = () => {
         // } else {
         //   console.log('Audio uploaded successfully:', data);
 
-          // Store session information in the database
+        //   // Store session information in the database
         //   const response = await fetch('/api/storeSession', {
         //     method: 'POST',
         //     headers: {
@@ -111,34 +124,12 @@ const AudioRecorder = () => {
         //   } else {
         //     console.error('Failed to store session information');
         //   }
-
-       
-
-        //}
-
-        // const audioUrl = URL.createObjectURL(audioBlob);
-        // const audio = new Audio(audioUrl);
-        // audio.play();
-
-
-        // audio.onended = () => {
-        //     URL.revokeObjectURL(audioUrl);
-        //     setAudioChunks([]);
-        //     setRecording(false);
-        //     setPaused(false);
-        //   };
-
-        // setAudioChunks([]);
-        // setRecording(false);
-        // setPaused(false);
-
-
-        
-      };
+        // }
+      } else {
+        console.log('No audio chunks to record');
+      }
     }
-
-
-  };
+}
 
   return (
     <div>
