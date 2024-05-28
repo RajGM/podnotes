@@ -51,7 +51,6 @@ const AudioRecorder = () => {
     }
   };
   
-
   const pauseRecording = () => {
     if (mediaRecorder && mediaRecorder.state === 'recording') {
       mediaRecorder.pause();
@@ -66,7 +65,7 @@ const AudioRecorder = () => {
     }
   };
 
-  const stopRecording = () => {
+  const stopRecording = async () => {
     if (mediaRecorder) {
       mediaRecorder.stop();
       
@@ -76,7 +75,7 @@ const AudioRecorder = () => {
         };
       });
 
-      //await stopHandler;
+      await stopHandler;
 
       console.log("Recording stopped, audioChunks:", audioChunks);
 
@@ -129,6 +128,11 @@ const AudioRecorder = () => {
         console.log('No audio chunks to record');
       }
     }
+
+
+
+
+
 }
 
   return (
