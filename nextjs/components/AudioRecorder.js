@@ -1,7 +1,7 @@
 // components/AudioRecorder.js
 "use client"
 
-import { useState, useRef, useEffect  } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -11,80 +11,131 @@ const bucketName = 'audio-recordings';
 
 const AudioRecorder = () => {
     const [mediaRecorder, setMediaRecorder] = useState(null);
-
-    // State to track whether recording is currently in progress
+    const [sessionId, setSessionId] = useState('');
     const [recording, setRecording] = useState(false);
-  
-    // Ref to store audio chunks during recording
+    const [paused, setPaused] = useState(false);
+    const [timerId, setTimerId] = useState(null);
+
     const chunks = useRef([]);
-  
-    // Function to start the recording
+    const isFinalChunk = useRef(false); // Ref to track if it's the final chunk
+
     const startRecording = () => {
-      if (mediaRecorder) {
-        mediaRecorder.start();
-        setRecording(true);
-      }
+        if (mediaRecorder) {
+            mediaRecorder.start(5000);
+            setRecording(true);
+            setPaused(false);
+            startChunkUploadTimer();
+        }
     };
-  
-    // Function to stop the recording
-    const stopRecording = () => {
-      if (mediaRecorder) {
-        mediaRecorder.stop(); 
-        setRecording(false);
-      }
-    };
-  
-    // Function to initialize the media recorder with the provided stream
-    const initialMediaRecorder = (stream) => {
-      const mediaRecorder = new MediaRecorder(stream);
-  
-      // Event handler when recording starts
-      mediaRecorder.onstart = () => {
-        chunks.current = []; // Resetting chunks array
-      };
-  
-      // Event handler when data becomes available during recording
-      mediaRecorder.ondataavailable = (ev) => {
-        chunks.current.push(ev.data); // Storing data chunks
-      };
-  
-      // Event handler when recording stops
-      mediaRecorder.onstop = () => {
-        // Creating a blob from accumulated audio chunks with WAV format
-        const audioBlob = new Blob(chunks.current, { type: "audio/wav" });
-        console.log(audioBlob, 'audioBlob')
-        const audioUrl = URL.createObjectURL(audioBlob);
-        console.log(audioUrl);
 
-        // Play the recorded audio
-        const audio = new Audio(audioUrl);
-        audio.play().catch(error => {
-          console.error('Error playing audio:', error);
+    const stopRecording = async () => {
+        if (mediaRecorder) {
+            clearInterval(timerId);
+            isFinalChunk.current = true; // Mark as final chunk
+            mediaRecorder.stop();
+            setRecording(false);
+            setPaused(false);
+        }
+    };
+
+    const togglePauseResume = () => {
+        if (mediaRecorder) {
+            if (paused) {
+                mediaRecorder.resume();
+                setPaused(false);
+            } else {
+                mediaRecorder.pause();
+                setPaused(true);
+            }
+        }
+    };
+
+    const startChunkUploadTimer = () => {
+        const id = setInterval(async () => {
+            console.log("Checking chunks...")
+            if (chunks.current.length > 0) {
+                console.log("Uploading chunks...")
+                uploadChunks();
+            }
+        }, 5000); // 5 seconds
+        setTimerId(id);
+    };
+
+    const uploadChunks = async () => {
+        if (chunks.current.length === 0) {
+            return; // No chunks to upload
+        }
+
+        const audioBlob = new Blob(chunks.current, { type: "audio/webm" });
+        chunks.current = []; // Clear current chunks after creating the blob
+
+        const filePath = `${sessionId}/recording-${Date.now()}.webm`;
+        console.log('Uploading to:', filePath); // Debugging log
+        const { data, error } = await supabase.storage.from(bucketName).upload(filePath, audioBlob, {
+            contentType: 'audio/webm',
         });
-        // You can do something with the audioBlob, like sending it to a server or processing it further
-      };
-  
-      setMediaRecorder(mediaRecorder);
-    };
-  
-    useEffect(() => {
-      if (typeof window !== "undefined") {
-        navigator.mediaDevices
-          .getUserMedia({ audio: true })
-          .then(initialMediaRecorder);
-      }
-    }, []); 
 
-  return (
-    <div>
-      <button onClick={startRecording} disabled={recording}>
-        Start
-      </button>
-      <button onClick={stopRecording} disabled={!recording}>
-        Stop
-      </button>
-    </div>
-  );
+        if (error) {
+            console.error('Error uploading audio:', error);
+        } else {
+            console.log('Audio uploaded successfully:', data);
+        }
+    };
+
+    const initialMediaRecorder = (stream) => {
+        const mediaRecorder = new MediaRecorder(stream);
+
+        mediaRecorder.onstart = () => {
+            chunks.current = [];
+            console.log("MediaRecorder started, chunks reset");
+        };
+
+        mediaRecorder.ondataavailable = async (ev) => {
+            if (ev.data.size > 0) {
+                chunks.current.push(ev.data);
+                console.log("Data available, chunk added:", ev.data);
+                
+                // If it's the final chunk, upload immediately
+                if (isFinalChunk.current) {
+                    await uploadChunks();
+                    isFinalChunk.current = false;
+                }
+            }
+        };
+
+        mediaRecorder.onstop = async () => {
+            console.log("MediaRecorder stopped");
+            // Upload the final chunk when recording stops
+            await uploadChunks();
+        };
+
+        setMediaRecorder(mediaRecorder);
+    };
+
+    useEffect(() => {
+        const newSessionId = `session-${Date.now()}`;
+        setSessionId(newSessionId);
+        console.log('New session ID:', newSessionId); // Debugging log
+        if (typeof window !== "undefined") {
+            navigator.mediaDevices
+                .getUserMedia({ audio: true })
+                .then(initialMediaRecorder);
+        }
+    }, []);
+
+    return (
+        <div>
+            <button onClick={startRecording} disabled={recording}>
+                Start
+            </button>
+            <button onClick={stopRecording} disabled={!recording}>
+                Stop
+            </button>
+            <button onClick={togglePauseResume} disabled={!recording}>
+                {paused ? "Resume" : "Pause"}
+            </button>
+        </div>
+    );
 };
 
 export default AudioRecorder;
