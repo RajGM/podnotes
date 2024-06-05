@@ -1,4 +1,3 @@
-// components/AudioRecorder.js
 "use client"
 
 import { useState, useRef, useEffect } from 'react';
@@ -11,9 +10,7 @@ const bucketName = 'audio-recordings';
 
 const AudioRecorder = () => {
     const [mediaRecorder, setMediaRecorder] = useState(null);
-    const [sessionId, setSessionId] = useState('');
     const [recording, setRecording] = useState(false);
-    const [paused, setPaused] = useState(false);
     const [timerId, setTimerId] = useState(null);
 
     const chunks = useRef([]);
@@ -23,8 +20,6 @@ const AudioRecorder = () => {
         if (mediaRecorder) {
             mediaRecorder.start(5000);
             setRecording(true);
-            setPaused(false);
-            startChunkUploadTimer();
         }
     };
 
@@ -34,31 +29,7 @@ const AudioRecorder = () => {
             isFinalChunk.current = true; // Mark as final chunk
             mediaRecorder.stop();
             setRecording(false);
-            setPaused(false);
         }
-    };
-
-    const togglePauseResume = () => {
-        if (mediaRecorder) {
-            if (paused) {
-                mediaRecorder.resume();
-                setPaused(false);
-            } else {
-                mediaRecorder.pause();
-                setPaused(true);
-            }
-        }
-    };
-
-    const startChunkUploadTimer = () => {
-        const id = setInterval(async () => {
-            console.log("Checking chunks...")
-            if (chunks.current.length > 0) {
-                console.log("Uploading chunks...")
-                uploadChunks();
-            }
-        }, 5000); // 5 seconds
-        setTimerId(id);
     };
 
     const uploadChunks = async () => {
@@ -66,10 +37,10 @@ const AudioRecorder = () => {
             return; // No chunks to upload
         }
 
-        const audioBlob = new Blob(chunks.current, { type: "audio/webm" });
+        const audioBlob = new Blob(chunks.current, { type: "audio/webm;codecs=opus" });
         chunks.current = []; // Clear current chunks after creating the blob
 
-        const filePath = `${sessionId}/recording-${Date.now()}.webm`;
+        const filePath = `recording-${Date.now()}.webm`;
         console.log('Uploading to:', filePath); // Debugging log
         const { data, error } = await supabase.storage.from(bucketName).upload(filePath, audioBlob, {
             contentType: 'audio/webm',
@@ -113,9 +84,6 @@ const AudioRecorder = () => {
     };
 
     useEffect(() => {
-        const newSessionId = `session-${Date.now()}`;
-        setSessionId(newSessionId);
-        console.log('New session ID:', newSessionId); // Debugging log
         if (typeof window !== "undefined") {
             navigator.mediaDevices
                 .getUserMedia({ audio: true })
@@ -130,9 +98,6 @@ const AudioRecorder = () => {
             </button>
             <button onClick={stopRecording} disabled={!recording}>
                 Stop
-            </button>
-            <button onClick={togglePauseResume} disabled={!recording}>
-                {paused ? "Resume" : "Pause"}
             </button>
         </div>
     );
