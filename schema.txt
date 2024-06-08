@@ -17,6 +17,7 @@ CREATE TABLE notes (
     date TIMESTAMPTZ DEFAULT NOW(),
     transcript TEXT,
     displayText TEXT
+    displaySummary TEXT
     audio_url TEXT,
     content JSONB,
     speaker_citation JSONB,
@@ -25,3 +26,6 @@ CREATE TABLE notes (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+
+error table for failed actions 
