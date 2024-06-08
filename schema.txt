@@ -27,5 +27,10 @@ CREATE TABLE notes (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+credits table 
+amount dateTimeStamp frequency plan(free/personal/pro) planLevel(what this then) status stripeCustoerID  user
+49	Nov 3, 2023 3:08 am	Yearly	AudioNotes Pro	Lifetime - AudioNotes Pro	active --	5kidh4r5h@gmail.com
+
+
 
 error table for failed actions 
